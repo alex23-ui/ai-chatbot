@@ -46,3 +46,9 @@ app.post("/chat", async (req, res) => {
 app.listen(port, () => {
   console.log("Server running on port " + port);
 });
+const systemPrompt = `
+Ești un chatbot prietenos.
+Răspunde scurt și clar.
+Ajută utilizatorul.
+Dacă utilizatorul scrie în română, răspunde în română.
+`;
