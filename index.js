@@ -1,4 +1,3 @@
-
 const express = require("express");
 const OpenAI = require("openai");
 
@@ -13,7 +12,7 @@ const client = new OpenAI({
 });
 
 app.get("/", (req, res) => {
-  res.send("Chatbot is running");
+  res.sendFile(__dirname + "/public/index.html");
 });
 
 app.post("/chat", async (req, res) => {
@@ -21,7 +20,7 @@ app.post("/chat", async (req, res) => {
     const message = req.body.message;
 
     if (!message) {
-      return res.status(400).json({ error: "Mesaj lipsă" });
+      return res.status(400).json({ reply: "Mesaj lipsă." });
     }
 
     const response = await client.responses.create({
@@ -29,14 +28,13 @@ app.post("/chat", async (req, res) => {
       input: message
     });
 
-    res.json({
-      reply: response.output_text || "Nu am primit răspuns."
-    });
+    const reply = response.output_text || "Nu am putut genera răspuns.";
+
+    res.json({ reply });
   } catch (error) {
-    console.error(error);
+    console.error("Chat error:", error);
     res.status(500).json({
-      error: "Eroare server",
-      details: error.message
+      reply: "A apărut o eroare la server."
     });
   }
 });
