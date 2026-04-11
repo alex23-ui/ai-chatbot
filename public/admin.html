@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="ro">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Admin programări</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      background: #f3f4f6;
+      margin: 0;
+      padding: 30px;
+    }
+    .wrap {
+      max-width: 1000px;
+      margin: auto;
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+    }
+    h1 {
+      margin-top: 0;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    th, td {
+      padding: 12px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: left;
+    }
+    th {
+      background: #111827;
+      color: white;
+    }
+    button {
+      padding: 8px 12px;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
+      background: #dc2626;
+      color: white;
+    }
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+    .refresh {
+      background: #111827;
+    }
+    .empty {
+      margin-top: 20px;
+      color: #666;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="topbar">
+      <h1>Panou admin programări</h1>
+      <button class="refresh" onclick="loadAppointments()">Refresh</button>
+    </div>
+
+    <div id="content"></div>
+  </div>
+
+  <script>
+    async function loadAppointments() {
+      const content = document.getElementById("content");
+      content.innerHTML = "Se încarcă...";
+
+      try {
+        const res = await fetch("/api/appointments");
+        const data = await res.json();
+
+        if (!data.length) {
+          content.innerHTML = '<div class="empty">Nu există programări.</div>';
+          return;
+        }
+
+        let html = `
+          <table>
+            <thead>
+              <tr>
+                <th>Nume</th>
+                <th>Serviciu</th>
+                <th>Zi</th>
+                <th>Oră</th>
+                <th>Creat</th>
+                <th>Acțiune</th>
+              </tr>
+            </thead>
+            <tbody>
+        `;
+
+        for (const item of data) {
+          html += `
+            <tr>
+              <td>${item.name}</td>
+              <td>${item.service}</td>
+              <td>${item.day}</td>
+              <td>${item.time}</td>
+              <td>${new Date(item.createdAt).toLocaleString()}</td>
+              <td><button onclick="deleteAppointment(${item.id})">Șterge</button></td>
+            </tr>
+          `;
+        }
+
+        html += `</tbody></table>`;
+        content.innerHTML = html;
+      } catch (error) {
+        content.innerHTML = "Eroare la încărcare.";
+      }
+    }
+
+    async function deleteAppointment(id) {
+      const ok = confirm("Sigur vrei să ștergi programarea?");
+      if (!ok) return;
+
+      await fetch("/api/appointments/" + id, {
+        method: "DELETE"
+      });
+
+      loadAppointments();
+    }
+
+    loadAppointments();
+  </script>
+</body>
+</html>
