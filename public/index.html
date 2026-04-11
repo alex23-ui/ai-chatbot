@@ -3,23 +3,21 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Chatbot</title>
+  <title>Chatbot cu programări</title>
   <style>
     body {
       margin: 0;
       font-family: Arial, sans-serif;
       background: #f4f6f8;
     }
-
     .container {
-      max-width: 800px;
+      max-width: 850px;
       margin: 30px auto;
       background: white;
       border-radius: 16px;
       box-shadow: 0 8px 24px rgba(0,0,0,0.08);
       overflow: hidden;
     }
-
     .header {
       padding: 20px;
       font-size: 24px;
@@ -27,23 +25,19 @@
       background: #111827;
       color: white;
     }
-
     #chat {
       height: 500px;
       overflow-y: auto;
       padding: 20px;
       background: #fafafa;
     }
-
     .msg {
       margin-bottom: 14px;
       line-height: 1.5;
     }
-
     .user {
       text-align: right;
     }
-
     .user span {
       display: inline-block;
       background: #dbeafe;
@@ -51,7 +45,6 @@
       border-radius: 14px;
       max-width: 75%;
     }
-
     .bot span {
       display: inline-block;
       background: #e5e7eb;
@@ -59,7 +52,6 @@
       border-radius: 14px;
       max-width: 75%;
     }
-
     .input-area {
       display: flex;
       gap: 10px;
@@ -67,7 +59,6 @@
       border-top: 1px solid #eee;
       background: white;
     }
-
     input {
       flex: 1;
       padding: 14px;
@@ -76,7 +67,6 @@
       border-radius: 12px;
       outline: none;
     }
-
     button {
       padding: 14px 18px;
       font-size: 16px;
@@ -86,23 +76,37 @@
       background: #111827;
       color: white;
     }
-
-    button:hover {
-      opacity: 0.95;
-    }
-
     .typing {
       color: #666;
       font-style: italic;
       margin-bottom: 12px;
     }
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 0 16px 16px;
+      background: white;
+    }
+    .quick-actions button {
+      background: #374151;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
-    <div class="header">AI Chatbot</div>
+    <div class="header">Chatbot cu programări</div>
 
     <div id="chat"></div>
+
+    <div class="quick-actions">
+      <button onclick="quickMessage('Vreau să fac o programare')">Programare</button>
+      <button onclick="quickMessage('Care este programul?')">Program</button>
+      <button onclick="quickMessage('Ce prețuri aveți?')">Prețuri</button>
+      <button onclick="quickMessage('Unde sunteți?')">Adresă</button>
+    </div>
 
     <div class="input-area">
       <input id="message" type="text" placeholder="Scrie mesajul..." />
@@ -117,10 +121,16 @@
 
     localStorage.setItem("sessionId", sessionId);
 
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.innerText = text;
+      return div.innerHTML;
+    }
+
     function addMessage(text, sender) {
       const div = document.createElement("div");
       div.className = "msg " + sender;
-      div.innerHTML = `<span>${text}</span>`;
+      div.innerHTML = `<span>${escapeHtml(text)}</span>`;
       chat.appendChild(div);
       chat.scrollTop = chat.scrollHeight;
     }
@@ -139,8 +149,8 @@
       if (typing) typing.remove();
     }
 
-    async function sendMessage() {
-      const message = input.value.trim();
+    async function sendMessage(customMessage) {
+      const message = customMessage || input.value.trim();
       if (!message) return;
 
       addMessage(message, "user");
@@ -153,10 +163,7 @@
           headers: {
             "Content-Type": "application/json"
           },
-          body: JSON.stringify({
-            message,
-            sessionId
-          })
+          body: JSON.stringify({ message, sessionId })
         });
 
         const data = await res.json();
@@ -168,11 +175,17 @@
       }
     }
 
+    function quickMessage(text) {
+      sendMessage(text);
+    }
+
     input.addEventListener("keypress", function(e) {
       if (e.key === "Enter") {
         sendMessage();
       }
     });
+
+    addMessage("Salut! Te pot ajuta cu servicii, prețuri și programări.", "bot");
   </script>
 </body>
 </html>
