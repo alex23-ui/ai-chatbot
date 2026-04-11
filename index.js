@@ -1,3 +1,4 @@
+
 const express = require("express");
 const OpenAI = require("openai");
 
@@ -11,16 +12,17 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
+// test
 app.get("/", (req, res) => {
-  res.sendFile(__dirname + "/public/index.html");
+  res.send("Chatbot is running");
 });
 
 app.post("/chat", async (req, res) => {
   try {
     const message = req.body.message;
 
-    if (!message) {
-      return res.status(400).json({ reply: "Mesaj lipsă." });
+    if (!message || !message.trim()) {
+      return res.json({ reply: "Mesaj gol." });
     }
 
     const response = await client.responses.create({
@@ -28,17 +30,19 @@ app.post("/chat", async (req, res) => {
       input: message
     });
 
-    const reply = response.output_text || "Nu am putut genera răspuns.";
+    const reply = response.output_text || "Nu am primit răspuns.";
 
     res.json({ reply });
+
   } catch (error) {
-    console.error("Chat error:", error);
+    console.error("OpenAI error:", error);
+
     res.status(500).json({
-      reply: "A apărut o eroare la server."
+      reply: "Eroare server: " + (error?.message || "necunoscută")
     });
   }
 });
 
 app.listen(port, () => {
-  console.log(`Serverul rulează pe portul ${port}`);
+  console.log("Server running on port " + port);
 });
