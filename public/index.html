@@ -1,12 +1,45 @@
+
 <!DOCTYPE html>
 <html lang="ro">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>AI Chatbot</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 700px;
+      margin: 40px auto;
+      padding: 0 16px;
+    }
+
+    #chat {
+      border: 1px solid #ccc;
+      border-radius: 10px;
+      padding: 16px;
+      min-height: 300px;
+      margin-bottom: 16px;
+      white-space: pre-wrap;
+    }
+
+    input {
+      width: 70%;
+      padding: 10px;
+      font-size: 16px;
+    }
+
+    button {
+      padding: 10px 16px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+
+    p {
+      margin: 8px 0;
+    }
+  </style>
 </head>
 <body>
-
   <h1>AI Chatbot</h1>
 
   <div id="chat"></div>
@@ -19,26 +52,28 @@
       const input = document.getElementById("message");
       const chat = document.getElementById("chat");
 
-      const message = input.value;
+      const message = input.value.trim();
       if (!message) return;
 
       chat.innerHTML += "<p><b>Tu:</b> " + message + "</p>";
-
       input.value = "";
 
-      const res = await fetch("/chat", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify({ message })
-      });
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message })
+        });
 
-      const data = await res.json();
+        const data = await res.json();
 
-      chat.innerHTML += "<p><b>Bot:</b> " + data.reply + "</p>";
+        chat.innerHTML += "<p><b>Bot:</b> " + (data.reply || "Fără răspuns") + "</p>";
+      } catch (err) {
+        chat.innerHTML += "<p><b>Bot:</b> Eroare la conectare cu serverul.</p>";
+      }
     }
   </script>
-
 </body>
 </html>
