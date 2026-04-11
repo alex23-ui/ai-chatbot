@@ -1,4 +1,3 @@
-
 const express = require("express");
 const OpenAI = require("openai");
 
@@ -12,32 +11,56 @@ const client = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 });
 
-// test
-app.get("/", (req, res) => {
-  res.send("Chatbot is running");
-});
+const systemPrompt = `
+Ești un chatbot prietenos, util și clar.
+Răspunde scurt și natural.
+Dacă utilizatorul scrie în română, răspunde în română.
+Dacă nu știi ceva, spune sincer.
+`;
+
+const conversations = {};
 
 app.post("/chat", async (req, res) => {
   try {
-    const message = req.body.message;
+    const { message, sessionId } = req.body;
 
     if (!message || !message.trim()) {
-      return res.json({ reply: "Mesaj gol." });
+      return res.status(400).json({ reply: "Mesaj gol." });
     }
+
+    const id = sessionId || "default";
+
+    if (!conversations[id]) {
+      conversations[id] = [];
+    }
+
+    conversations[id].push({
+      role: "user",
+      content: message
+    });
+
+    const history = conversations[id]
+      .slice(-10)
+      .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+      .join("\n");
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      input: message
+      instructions: systemPrompt,
+      input: history
     });
 
     const reply = response.output_text || "Nu am primit răspuns.";
 
-    res.json({ reply });
+    conversations[id].push({
+      role: "assistant",
+      content: reply
+    });
 
+    return res.json({ reply });
   } catch (error) {
     console.error("OpenAI error:", error);
-
-    res.status(500).json({
+    return res.status(500).json({
       reply: "Eroare server: " + (error?.message || "necunoscută")
     });
   }
@@ -46,9 +69,3 @@ app.post("/chat", async (req, res) => {
 app.listen(port, () => {
   console.log("Server running on port " + port);
 });
-const systemPrompt = `
-Ești un chatbot prietenos.
-Răspunde scurt și clar.
-Ajută utilizatorul.
-Dacă utilizatorul scrie în română, răspunde în română.
-`;
