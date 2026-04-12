@@ -36,7 +36,20 @@ function saveAppointments(appointments) {
 }
 
 const businessInfo = `
-Numele firmei: FreshCut Barbershop
+Ești asistentul virtual al firmei FreshCut Barbershop.
+
+REGULI IMPORTANTE:
+- Răspunzi scurt, clar și politicos.
+- Dacă utilizatorul scrie în română, răspunzi în română.
+- Nu inventezi informații.
+- Dacă nu ai informația, spui exact: "Nu am această informație momentan."
+- Dacă utilizatorul întreabă despre program, prețuri, adresă sau servicii, folosești DOAR informațiile de mai jos.
+- Nu modifica prețurile, programul sau adresa.
+- Nu adăuga informații care nu există în datele firmei.
+
+DATE FIRMĂ:
+Nume: FreshCut Barbershop
+
 Program:
 - Luni - Vineri: 09:00 - 19:00
 - Sâmbătă: 10:00 - 16:00
@@ -45,16 +58,10 @@ Program:
 Adresă: 12 King Street, London
 Telefon: 07123 456789
 
-Servicii:
+Servicii și prețuri:
 - Tuns bărbați - £15
 - Tuns + barbă - £25
 - Barbă - £10
-
-Reguli:
-- Răspunde scurt, clar și politicos.
-- Dacă utilizatorul scrie în română, răspunde în română.
-- Dacă întreabă despre program, servicii, adresă sau prețuri, folosește datele firmei.
-- Dacă vrea programare, cere pe rând: nume, serviciu, zi, oră.
 `;
 
 const conversations = {};
@@ -72,22 +79,62 @@ function isBookingIntent(message) {
   );
 }
 
+function normalizeDay(day) {
+  const map = {
+    "luni": "Luni",
+    "marți": "Marți",
+    "marti": "Marți",
+    "miercuri": "Miercuri",
+    "joi": "Joi",
+    "vineri": "Vineri",
+    "sâmbătă": "Sâmbătă",
+    "sambata": "Sâmbătă",
+    "duminică": "Duminică",
+    "duminica": "Duminică"
+  };
+
+  return map[day.toLowerCase()] || day;
+}
+
+function isClosedDay(day) {
+  const lower = day.toLowerCase();
+  return lower === "duminică" || lower === "duminica";
+}
+
+function isReasonableName(text) {
+  const trimmed = text.trim();
+
+  if (trimmed.length < 2 || trimmed.length > 50) return false;
+  if (/\d/.test(trimmed)) return false;
+  if (/[:@/\\]/.test(trimmed)) return false;
+
+  return /^[a-zA-ZăâîșțĂÂÎȘȚ\- ]+$/.test(trimmed);
+}
+
 function extractBookingDetails(message, state = {}) {
   const updated = { ...state };
   const text = message.trim();
   const lower = text.toLowerCase();
 
   if (!updated.name) {
-    const match =
-      text.match(/(?:ma numesc|mă numesc|numele meu este|sunt)\s+([a-zA-Zăâîșț\- ]{2,})/i) ||
-      text.match(/^([A-ZĂÂÎȘȚ][a-zăâîșț\-]+(?:\s+[A-ZĂÂÎȘȚ]?[a-zăâîșț\-]+){0,2})$/);
-    if (match) {
-      updated.name = match[1].trim();
+    const nameMatch = text.match(
+      /(?:ma numesc|mă numesc|numele meu este|sunt)\s+([a-zA-ZăâîșțĂÂÎȘȚ\- ]{2,50})/i
+    );
+
+    if (nameMatch) {
+      updated.name = nameMatch[1].trim();
+    } else if (isReasonableName(text)) {
+      updated.name = text;
     }
   }
 
   if (!updated.service) {
-    if (lower.includes("tuns + barbă") || lower.includes("tuns si barba") || lower.includes("tuns și barbă")) {
+    if (
+      lower.includes("tuns + barbă") ||
+      lower.includes("tuns si barba") ||
+      lower.includes("tuns și barbă") ||
+      lower.includes("tuns + barba")
+    ) {
       updated.service = "Tuns + barbă";
     } else if (lower.includes("barbă") || lower.includes("barba")) {
       updated.service = "Barbă";
@@ -97,9 +144,11 @@ function extractBookingDetails(message, state = {}) {
   }
 
   if (!updated.day) {
-    const dayMatch = text.match(/\b(luni|marți|marti|miercuri|joi|vineri|sâmbătă|sambata|duminică|duminica)\b/i);
+    const dayMatch = text.match(
+      /\b(luni|marți|marti|miercuri|joi|vineri|sâmbătă|sambata|duminică|duminica)\b/i
+    );
     if (dayMatch) {
-      updated.day = dayMatch[1];
+      updated.day = normalizeDay(dayMatch[1]);
     }
   }
 
@@ -145,28 +194,38 @@ app.post("/chat", async (req, res) => {
 
     const id = sessionId || "default";
 
-    if (!conversations[id]) conversations[id] = [];
+    if (!conversations[id]) {
+      conversations[id] = [];
+    }
+
     if (!bookingState[id]) {
       bookingState[id] = {
         active: false,
         name: "",
         service: "",
         day: "",
-        time: "",
+        time: ""
       };
     }
 
     conversations[id].push({
       role: "user",
-      content: message,
+      content: message
     });
 
     if (isBookingIntent(message) || bookingState[id].active) {
       bookingState[id] = {
         ...bookingState[id],
         ...extractBookingDetails(message, bookingState[id]),
-        active: true,
+        active: true
       };
+
+      if (bookingState[id].day && isClosedDay(bookingState[id].day)) {
+        bookingState[id].day = "";
+        return res.json({
+          reply: "Duminică este închis. Alege altă zi, te rog."
+        });
+      }
 
       const question = nextBookingQuestion(bookingState[id]);
 
@@ -175,6 +234,7 @@ app.post("/chat", async (req, res) => {
       }
 
       const appointments = readAppointments();
+
       const newAppointment = {
         id: Date.now(),
         name: bookingState[id].name,
@@ -182,7 +242,7 @@ app.post("/chat", async (req, res) => {
         day: bookingState[id].day,
         time: bookingState[id].time,
         createdAt: new Date().toISOString(),
-        sessionId: id,
+        sessionId: id
       };
 
       appointments.push(newAppointment);
@@ -192,7 +252,7 @@ app.post("/chat", async (req, res) => {
 
       conversations[id].push({
         role: "assistant",
-        content: confirmation,
+        content: confirmation
       });
 
       bookingState[id] = {
@@ -200,35 +260,38 @@ app.post("/chat", async (req, res) => {
         name: "",
         service: "",
         day: "",
-        time: "",
+        time: ""
       };
 
       return res.json({ reply: confirmation });
     }
 
     const history = conversations[id]
-      .slice(-10)
+      .slice(-8)
       .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
       .join("\n");
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
       instructions: businessInfo,
-      input: history,
+      input: history || message
     });
 
     const reply = response.output_text || "Nu am primit răspuns.";
 
+    console.log("User message:", message);
+    console.log("AI reply:", reply);
+
     conversations[id].push({
       role: "assistant",
-      content: reply,
+      content: reply
     });
 
     return res.json({ reply });
   } catch (error) {
     console.error("OpenAI error:", error);
     return res.status(500).json({
-      reply: "Eroare server: " + (error?.message || "necunoscută"),
+      reply: "Eroare server: " + (error?.message || "necunoscută")
     });
   }
 });
