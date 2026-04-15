@@ -51,7 +51,7 @@ function createEmptyLeadState() {
 const conversations = {};
 const leadState = {};
 
-// EMAIL SETUP
+// EMAIL
 const transporter = nodemailer.createTransport({
   service: "gmail",
   auth: {
@@ -66,7 +66,7 @@ async function sendLeadEmail(lead) {
   await transporter.sendMail({
     from: `"SmartBot Chatbot" <${process.env.EMAIL_USER}>`,
     to,
-    subject: "Lead nou de la chatbot 🔥",
+    subject: "Lead nou de la chatbot",
     text: `
 Ai primit un lead nou.
 
@@ -339,7 +339,7 @@ app.post("/chat", async (req, res) => {
       const knownLeadData = JSON.stringify(buildLeadSummary(leadState[id]), null, 2);
 
       const response = await client.responses.create({
-        model: "gpt-5.4",
+        model: "gpt-4.1-mini",
         instructions: `${businessInfo}
 
 Current lead data already collected:
@@ -374,7 +374,7 @@ TASK:
       .join("\n");
 
     const response = await client.responses.create({
-      model: "gpt-5.4",
+      model: "gpt-4.1-mini",
       instructions: businessInfo,
       input: history || message,
     });
