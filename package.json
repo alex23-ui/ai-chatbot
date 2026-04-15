@@ -1,13 +1,11 @@
 {
-  "name": "ultra-smart-chatbot-email",
+  "name": "chatbot",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
     "start": "node index.js"
   },
   "dependencies": {
-    "express": "^4.21.2",
-    "nodemailer": "^6.9.15",
-    "openai": "^4.104.0"
+    "express": "^4.21.2"
   }
 }
