@@ -303,7 +303,7 @@ app.post("/chat", async (req, res) => {
       const knownLeadData = JSON.stringify(buildLeadSummary(leadState[id]), null, 2);
 
       const response = await client.responses.create({
-        model: "gpt-5.4",
+        model: "gpt-4.1-mini",
         instructions: `${businessInfo}
 
 Current lead data already collected:
@@ -338,7 +338,7 @@ TASK:
       .join("\n");
 
     const response = await client.responses.create({
-      model: "gpt-5.4",
+      model: "gpt-4.1-mini",
       instructions: businessInfo,
       input: history || message
     });
@@ -352,7 +352,7 @@ TASK:
 
     return res.json({ reply });
   } catch (error) {
-    console.error("Server error:", error);
+    console.error("CHAT ERROR:", error);
     return res.status(500).json({
       reply: "Eroare server: " + (error?.message || "necunoscută")
     });
