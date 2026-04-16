@@ -1,5 +1,6 @@
 const express = require("express");
 const OpenAI = require("openai");
+const nodemailer = require("nodemailer");
 const fs = require("fs");
 const path = require("path");
 
@@ -50,8 +51,42 @@ function createEmptyLeadState() {
 const conversations = {};
 const leadState = {};
 
+// EMAIL
+const transporter = nodemailer.createTransport({
+  service: "gmail",
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_APP_PASSWORD,
+  },
+});
+
+async function sendLeadEmail(lead) {
+  const to = process.env.NOTIFY_EMAIL || process.env.EMAIL_USER;
+
+  if (!process.env.EMAIL_USER || !process.env.EMAIL_APP_PASSWORD || !to) {
+    console.log("Email env vars missing. Skipping email send.");
+    return;
+  }
+
+  await transporter.sendMail({
+    from: `"SmartBot Chatbot" <${process.env.EMAIL_USER}>`,
+    to,
+    subject: "Lead nou de la chatbot",
+    text: `
+Ai primit un lead nou.
+
+Nume: ${lead.name}
+Telefon: ${lead.phone}
+Email: ${lead.email}
+Serviciu: ${lead.service}
+Detalii: ${lead.note}
+Data: ${new Date(lead.createdAt).toLocaleString()}
+    `,
+  });
+}
+
 const businessInfo = `
-You are the virtual assistant for SmartBot Solutions.
+You are a smart business chatbot for SmartBot Solutions.
 
 BUSINESS DETAILS:
 - Business name: SmartBot Solutions
@@ -65,25 +100,19 @@ BUSINESS DETAILS:
   - Sunday: Closed
 
 YOUR GOAL:
-- Talk naturally like a real assistant
-- Understand what the visitor wants
-- Help them clearly and politely
-- If they are interested, collect these details naturally:
-  1. name
-  2. phone
-  3. email
-  4. service they want
-  5. short note about what they need
+- help visitors
+- answer naturally
+- sound friendly and professional
+- collect lead details when someone is interested
 
-IMPORTANT RULES:
+RULES:
 - If the user writes in Romanian, reply in Romanian.
 - If the user writes in English, reply in English.
-- Do NOT ask all questions at once.
-- Ask only for the missing information.
-- Do NOT repeat the exact same question again and again.
-- Be short, helpful and professional.
-- If the user already gave information, do not ask for it again.
-- If all lead details are collected, confirm politely that the request has been saved.
+- Keep replies short and natural.
+- Do not ask all questions at once.
+- Ask only for missing information.
+- If the user already gave details, do not ask again.
+- If all lead details are collected, confirm clearly that the request has been saved.
 - Do not invent business details outside the info above.
 `;
 
@@ -159,19 +188,13 @@ function extractLeadDetails(message, currentState) {
   const text = message.trim();
 
   const email = extractEmail(text);
-  if (!updated.email && email) {
-    updated.email = email;
-  }
+  if (!updated.email && email) updated.email = email;
 
   const phone = extractPhone(text);
-  if (!updated.phone && phone) {
-    updated.phone = phone;
-  }
+  if (!updated.phone && phone) updated.phone = phone;
 
   const service = extractService(text);
-  if (!updated.service && service) {
-    updated.service = service;
-  }
+  if (!updated.service && service) updated.service = service;
 
   if (!updated.name) {
     const explicitName = text.match(
@@ -201,24 +224,16 @@ function extractLeadDetails(message, currentState) {
 
 function getMissingFields(state) {
   const missing = [];
-
   if (!state.name) missing.push("name");
   if (!state.phone) missing.push("phone");
   if (!state.email) missing.push("email");
   if (!state.service) missing.push("service");
   if (!state.note) missing.push("note");
-
   return missing;
 }
 
 function hasCompleteLead(state) {
-  return (
-    !!state.name &&
-    !!state.phone &&
-    !!state.email &&
-    !!state.service &&
-    !!state.note
-  );
+  return !!state.name && !!state.phone && !!state.email && !!state.service && !!state.note;
 }
 
 function buildLeadSummary(state) {
@@ -268,6 +283,7 @@ app.post("/chat", async (req, res) => {
       content: message
     });
 
+    // flow de lead
     if (wantsLead(message) || leadState[id].active) {
       leadState[id].active = true;
       leadState[id] = extractLeadDetails(message, leadState[id]);
@@ -277,6 +293,8 @@ app.post("/chat", async (req, res) => {
         const lead = {
           id: Date.now(),
           ...buildLeadSummary(leadState[id]),
+          language: /[ăâîșț]/i.test(message) ? "ro" : "en",
+          source: "website-chatbot",
           createdAt: new Date().toISOString(),
           sessionId: id
         };
@@ -286,6 +304,12 @@ app.post("/chat", async (req, res) => {
         saveLeads(leads);
 
         leadState[id].saved = true;
+
+        try {
+          await sendLeadEmail(lead);
+        } catch (emailError) {
+          console.error("EMAIL ERROR:", emailError);
+        }
 
         const confirmation = `Perfect, ${lead.name}. Am salvat cererea ta pentru ${lead.service}. Te vom contacta în curând la ${lead.phone} sau pe ${lead.email}.`;
 
@@ -302,6 +326,11 @@ app.post("/chat", async (req, res) => {
       const missing = getMissingFields(leadState[id]);
       const knownLeadData = JSON.stringify(buildLeadSummary(leadState[id]), null, 2);
 
+      const history = conversations[id]
+        .slice(-12)
+        .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
+        .join("\n");
+
       const response = await client.responses.create({
         model: "gpt-4.1-mini",
         instructions: `${businessInfo}
@@ -313,13 +342,15 @@ Missing fields:
 ${missing.join(", ") || "none"}
 
 TASK:
-- Reply naturally.
-- Ask only for the next missing piece of info.
-- Do not repeat info already collected.
-- Keep the message short.
-- If the user gave partial info, acknowledge it naturally.
+- Continue the conversation naturally.
+- Ask only for the single most important missing detail.
+- Acknowledge what the user already gave.
+- Sound like a real assistant, not a form.
+- Do not repeat the same wording again and again.
+- Keep replies short and confident.
+- Use the recent conversation history to stay coherent.
 `,
-        input: message
+        input: history || message
       });
 
       const reply = response.output_text || "Nu am primit răspuns.";
@@ -332,14 +363,21 @@ TASK:
       return res.json({ reply });
     }
 
+    // chat normal cu memorie
     const history = conversations[id]
-      .slice(-10)
+      .slice(-12)
       .map((msg) => `${msg.role === "user" ? "User" : "Assistant"}: ${msg.content}`)
       .join("\n");
 
     const response = await client.responses.create({
       model: "gpt-4.1-mini",
-      instructions: businessInfo,
+      instructions: `${businessInfo}
+
+IMPORTANT:
+- Remember the recent conversation.
+- Keep your replies natural.
+- If the user already gave information, do not ask for it again.
+`,
       input: history || message
     });
 
