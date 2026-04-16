@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Smart Chatbot</title>
+  <title>Smart Chatbot Pro</title>
   <style>
     body {
       margin: 0;
@@ -117,7 +117,7 @@
 </head>
 <body>
   <div class="container">
-    <div class="header">Smart Chatbot</div>
+    <div class="header">Smart Chatbot Pro</div>
 
     <div id="chat"></div>
 
@@ -145,8 +145,23 @@
     const voiceBtn = document.getElementById("voiceBtn");
 
     let voiceEnabled = true;
+    let selectedVoice = null;
 
     localStorage.setItem("sessionId", sessionId);
+
+    function loadPreferredVoice() {
+      const voices = window.speechSynthesis.getVoices();
+
+      selectedVoice =
+        voices.find(v => v.lang === "ro-RO") ||
+        voices.find(v => v.lang.startsWith("ro")) ||
+        voices.find(v => v.lang === "en-US") ||
+        voices[0] ||
+        null;
+    }
+
+    window.speechSynthesis.onvoiceschanged = loadPreferredVoice;
+    loadPreferredVoice();
 
     function escapeHtml(text) {
       const div = document.createElement("div");
@@ -161,9 +176,17 @@
       window.speechSynthesis.cancel();
 
       const utterance = new SpeechSynthesisUtterance(text);
-      utterance.lang = /[ăâîșț]/i.test(text) ? "ro-RO" : "en-US";
+
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+        utterance.lang = selectedVoice.lang;
+      } else {
+        utterance.lang = /[ăâîșț]/i.test(text) ? "ro-RO" : "en-US";
+      }
+
       utterance.rate = 1;
       utterance.pitch = 1;
+      utterance.volume = 1;
 
       window.speechSynthesis.speak(utterance);
     }
