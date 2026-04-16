@@ -4,18 +4,52 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Smart Chatbot</title>
-  <style>
-    body {
-      margin: 0;
-      font-family: Arial, sans-serif;
-      background: #f4f6f8;
+</head>
+<body>
+  <h1>Smart Chatbot</h1>
+
+  <div id="chat"></div>
+
+  <input id="message" type="text" placeholder="Scrie mesajul..." />
+  <button onclick="sendMessage()">Trimite</button>
+
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("message");
+    const sessionId = localStorage.getItem("sessionId") || "default-session";
+
+    localStorage.setItem("sessionId", sessionId);
+
+    function addMessage(text, sender) {
+      const p = document.createElement("p");
+      p.innerHTML = "<b>" + sender + ":</b> " + text;
+      chat.appendChild(p);
     }
 
-    .container {
-      max-width: 850px;
-      margin: 30px auto;
-      background: white;
-      border-radius: 16px;
-      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
-      overflow: hidden;
+    async function sendMessage(customMessage) {
+      const message = customMessage || input.value.trim();
+      if (!message) return;
+
+      addMessage(message, "Tu");
+      input.value = "";
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message, sessionId })
+        });
+
+        const data = await res.json();
+        addMessage(data.reply || "Fără răspuns", "Bot");
+      } catch (err) {
+        addMessage("Eroare la server.", "Bot");
+      }
     }
+
+    addMessage("Salut! Te pot ajuta cu ofertă, demo sau informații.", "Bot");
+  </script>
+</body>
+</html>
