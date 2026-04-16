@@ -1,37 +1,245 @@
 <!DOCTYPE html>
-<html>
+<html lang="ro">
 <head>
-  <title>Chatbot</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Smart Chatbot</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f4f6f8;
+    }
+
+    .container {
+      max-width: 850px;
+      margin: 30px auto;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0,0,0,0.08);
+      overflow: hidden;
+    }
+
+    .header {
+      padding: 20px;
+      font-size: 24px;
+      font-weight: bold;
+      background: #111827;
+      color: white;
+    }
+
+    #chat {
+      height: 500px;
+      overflow-y: auto;
+      padding: 20px;
+      background: #fafafa;
+    }
+
+    .msg {
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+
+    .user {
+      text-align: right;
+    }
+
+    .user span {
+      display: inline-block;
+      background: #dbeafe;
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 75%;
+    }
+
+    .bot span {
+      display: inline-block;
+      background: #e5e7eb;
+      padding: 10px 14px;
+      border-radius: 14px;
+      max-width: 75%;
+    }
+
+    .input-area {
+      display: flex;
+      gap: 10px;
+      padding: 16px;
+      border-top: 1px solid #eee;
+      background: white;
+    }
+
+    input {
+      flex: 1;
+      padding: 14px;
+      font-size: 16px;
+      border: 1px solid #d1d5db;
+      border-radius: 12px;
+      outline: none;
+    }
+
+    button {
+      padding: 14px 18px;
+      font-size: 16px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      background: #111827;
+      color: white;
+    }
+
+    .typing {
+      color: #666;
+      font-style: italic;
+      margin-bottom: 12px;
+    }
+
+    .quick-actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 0 16px 16px;
+      background: white;
+    }
+
+    .quick-actions button {
+      background: #374151;
+      padding: 10px 12px;
+      font-size: 14px;
+    }
+
+    .controls {
+      display: flex;
+      gap: 10px;
+      padding: 0 16px 16px;
+      background: white;
+    }
+  </style>
 </head>
 <body>
+  <div class="container">
+    <div class="header">Smart Chatbot</div>
 
-<h1>Chatbot</h1>
+    <div id="chat"></div>
 
-<div id="chat"></div>
+    <div class="quick-actions">
+      <button onclick="quickMessage('Vreau o ofertă')">Ofertă</button>
+      <button onclick="quickMessage('I need a chatbot for my business')">Need chatbot</button>
+      <button onclick="quickMessage('I want a demo')">Demo</button>
+      <button onclick="quickMessage('reset')">Reset</button>
+    </div>
 
-<input id="msg" placeholder="Scrie..." />
-<button onclick="send()">Trimite</button>
+    <div class="controls">
+      <button onclick="toggleVoice()" id="voiceBtn">Voice: ON</button>
+    </div>
 
-<script>
-async function send() {
-  const input = document.getElementById("msg");
-  const chat = document.getElementById("chat");
-  const text = input.value;
+    <div class="input-area">
+      <input id="message" type="text" placeholder="Scrie mesajul..." />
+      <button onclick="sendMessage()">Trimite</button>
+    </div>
+  </div>
 
-  chat.innerHTML += "<p><b>Tu:</b> " + text + "</p>";
+  <script>
+    const chat = document.getElementById("chat");
+    const input = document.getElementById("message");
+    const sessionId = localStorage.getItem("sessionId") || crypto.randomUUID();
+    const voiceBtn = document.getElementById("voiceBtn");
 
-  const res = await fetch("/chat", {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify({ message: text })
-  });
+    let voiceEnabled = true;
 
-  const data = await res.json();
+    localStorage.setItem("sessionId", sessionId);
 
-  chat.innerHTML += "<p><b>Bot:</b> " + data.reply + "</p>";
-  input.value = "";
-}
-</script>
+    function escapeHtml(text) {
+      const div = document.createElement("div");
+      div.innerText = text;
+      return div.innerHTML;
+    }
 
+    function speakText(text) {
+      if (!voiceEnabled) return;
+      if (!("speechSynthesis" in window)) return;
+
+      window.speechSynthesis.cancel();
+
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.lang = /[ăâîșț]/i.test(text) ? "ro-RO" : "en-US";
+      utterance.rate = 1;
+      utterance.pitch = 1;
+
+      window.speechSynthesis.speak(utterance);
+    }
+
+    function toggleVoice() {
+      voiceEnabled = !voiceEnabled;
+      voiceBtn.textContent = voiceEnabled ? "Voice: ON" : "Voice: OFF";
+
+      if (!voiceEnabled && "speechSynthesis" in window) {
+        window.speechSynthesis.cancel();
+      }
+    }
+
+    function addMessage(text, sender) {
+      const div = document.createElement("div");
+      div.className = "msg " + sender;
+      div.innerHTML = `<span>${escapeHtml(text)}</span>`;
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+
+      if (sender === "bot") {
+        speakText(text);
+      }
+    }
+
+    function addTyping() {
+      const div = document.createElement("div");
+      div.className = "typing";
+      div.id = "typing";
+      div.textContent = "Botul scrie...";
+      chat.appendChild(div);
+      chat.scrollTop = chat.scrollHeight;
+    }
+
+    function removeTyping() {
+      const typing = document.getElementById("typing");
+      if (typing) typing.remove();
+    }
+
+    async function sendMessage(customMessage) {
+      const message = customMessage || input.value.trim();
+      if (!message) return;
+
+      addMessage(message, "user");
+      input.value = "";
+      addTyping();
+
+      try {
+        const res = await fetch("/chat", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ message, sessionId })
+        });
+
+        const data = await res.json();
+        removeTyping();
+        addMessage(data.reply || "Fără răspuns", "bot");
+      } catch (err) {
+        removeTyping();
+        addMessage("Eroare la server.", "bot");
+      }
+    }
+
+    function quickMessage(text) {
+      sendMessage(text);
+    }
+
+    input.addEventListener("keypress", function(e) {
+      if (e.key === "Enter") {
+        sendMessage();
+      }
+    });
+
+    addMessage("Salut! Te pot ajuta cu ofertă, demo sau informații.", "bot");
+  </script>
 </body>
 </html>
